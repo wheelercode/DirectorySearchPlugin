@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.IO;
 using Microsoft.Win32.SafeHandles;
 
 namespace Wheelercode.DirectorySearchPlugin;
@@ -37,7 +38,7 @@ public static class MftDirectoryEnumerator
 
         using var volume = CreateFile(
             volumePath,
-            GenericRead,
+            0,
             FileShareRead | FileShareWrite | FileShareDelete,
             IntPtr.Zero,
             OpenExisting,

@@ -43,8 +43,8 @@ public sealed class Main : IPlugin
         }
 
         isIndexing = true;
-        Log("No persisted index found; starting initial scan.");
-        _ = Task.Run(() => InitializeIndexMFT(@"C:\"));
+        Log("No persisted index found; benchmarking index builders.");
+        _ = Task.Run(() => BenchmarkIndexInitialization(@"C:\"));
     }
 
     private void InitializeIndexMft(string root)
@@ -89,89 +89,13 @@ public sealed class Main : IPlugin
     {
         try
         {
-            var pathsByName = new Dictionary<string, List<string>>(
-                StringComparer.OrdinalIgnoreCase);
-
-            var pending = new Stack<string>();
-            pending.Push(root);
-
-            var directoryCount = 0;
-            var errorCount = 0;
-
-            while (pending.Count > 0)
-            {
-                var current = pending.Pop();
-                directoryCount++;
-
-                try
-                {
-                    foreach (var path in Directory.EnumerateDirectories(
-                        current,
-                        "*",
-                        SearchOption.TopDirectoryOnly))
-                    {
-                        try
-                        {
-                            var attributes = File.GetAttributes(path);
-
-                            if ((attributes & FileAttributes.ReparsePoint) != 0)
-                            {
-                                continue;
-                            }
-
-                            var name = Path.GetFileName(path);
-
-                            if (string.IsNullOrWhiteSpace(name))
-                            {
-                                continue;
-                            }
-
-                            if (!pathsByName.TryGetValue(name, out var paths))
-                            {
-                                paths = [];
-                                pathsByName[name] = paths;
-                            }
-
-                            paths.Add(path);
-                            pending.Push(path);
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                            errorCount++;
-                        }
-                        catch (IOException)
-                        {
-                            errorCount++;
-                        }
-                    }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    errorCount++;
-                }
-                catch (IOException)
-                {
-                    errorCount++;
-                }
-
-                if (directoryCount % 10_000 == 0)
-                {
-                    Log(
-                        $"Indexed directories: {directoryCount:N0}; " +
-                        $"unique names: {pathsByName.Count:N0}; " +
-                        $"errors: {errorCount:N0}");
-                }
-            }
+            var pathsByName = BuildDirectoryScanIndex(root);
 
             DirectoryIndexStore.Save(pathsByName);
             index = new DirectoryIndex(pathsByName);
             isIndexing = false;
 
-            Log(
-                $"Directory index complete. " +
-                $"Directories: {directoryCount:N0}; " +
-                $"unique names: {pathsByName.Count:N0}; " +
-                $"errors: {errorCount:N0}");
+            Log($"Directory index complete. Unique names: {pathsByName.Count:N0}");
 
             var search = lastSearch;
 
@@ -194,38 +118,151 @@ public sealed class Main : IPlugin
         }
     }
 
+    private Dictionary<string, List<string>> BuildDirectoryScanIndex(string root)
+    {
+        var pathsByName = new Dictionary<string, List<string>>(
+            StringComparer.OrdinalIgnoreCase);
+
+        var pending = new Stack<string>();
+        pending.Push(root);
+
+        var directoryCount = 0;
+        var errorCount = 0;
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            directoryCount++;
+
+            try
+            {
+                foreach (var path in Directory.EnumerateDirectories(
+                    current,
+                    "*",
+                    SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        var attributes = File.GetAttributes(path);
+
+                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            continue;
+                        }
+
+                        var name = Path.GetFileName(path);
+
+                        if (string.IsNullOrWhiteSpace(name))
+                        {
+                            continue;
+                        }
+
+                        if (!pathsByName.TryGetValue(name, out var paths))
+                        {
+                            paths = [];
+                            pathsByName[name] = paths;
+                        }
+
+                        paths.Add(path);
+                        pending.Push(path);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        errorCount++;
+                    }
+                    catch (IOException)
+                    {
+                        errorCount++;
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                errorCount++;
+            }
+            catch (IOException)
+            {
+                errorCount++;
+            }
+
+            if (directoryCount % 10_000 == 0)
+            {
+                Log(
+                    $"Directory scan progress: {directoryCount:N0}; " +
+                    $"unique names: {pathsByName.Count:N0}; " +
+                    $"errors: {errorCount:N0}");
+            }
+        }
+
+        Log(
+            $"Directory scan enumeration complete. " +
+            $"Directories: {directoryCount:N0}; " +
+            $"unique names: {pathsByName.Count:N0}; " +
+            $"errors: {errorCount:N0}");
+
+        return pathsByName;
+    }
+
+    private Dictionary<string, List<string>> BuildMftIndex(string root)
+    {
+        return MftDirectoryEnumerator.Enumerate(root);
+    }
+
     private void BenchmarkIndexInitialization(string root)
     {
-        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
 
-        stopwatch.Restart();
-        var directoryScanIndex = BuildDirectoryScanIndex(root);
-        var directoryScanElapsed = stopwatch.Elapsed;
+            Log("Benchmark: starting recursive directory scan.");
+            stopwatch.Restart();
+            var directoryScanIndex = BuildDirectoryScanIndex(root);
+            var directoryScanElapsed = stopwatch.Elapsed;
 
-        Log(
-            $"Directory scan benchmark: " +
-            $"Unique names: {directoryScanIndex.Count:N0}; " +
-            $"Elapsed: {directoryScanElapsed}");
+            Log(
+                $"Directory scan benchmark: " +
+                $"Unique names: {directoryScanIndex.Count:N0}; " +
+                $"Elapsed: {directoryScanElapsed}");
 
-        stopwatch.Restart();
-        var mftIndex = BuildMftIndex(root);
-        var mftElapsed = stopwatch.Elapsed;
+            Log("Benchmark: starting MFT enumeration.");
+            stopwatch.Restart();
+            var mftIndex = BuildMftIndex(root);
+            var mftElapsed = stopwatch.Elapsed;
 
-        Log(
-            $"MFT enumeration benchmark: " +
-            $"Unique names: {mftIndex.Count:N0}; " +
-            $"Elapsed: {mftElapsed}");
+            Log(
+                $"MFT enumeration benchmark: " +
+                $"Unique names: {mftIndex.Count:N0}; " +
+                $"Elapsed: {mftElapsed}");
 
-        Log(
-            $"MFT speedup: " +
-            $"{directoryScanElapsed.TotalMilliseconds / mftElapsed.TotalMilliseconds:F2}x");
+            if (mftElapsed > TimeSpan.Zero)
+            {
+                Log(
+                    $"MFT speedup: " +
+                    $"{directoryScanElapsed.TotalMilliseconds / mftElapsed.TotalMilliseconds:F2}x");
+            }
 
-        // Use the MFT result as the active index.
-        DirectoryIndexStore.Save(mftIndex);
-        index = new DirectoryIndex(mftIndex);
-        isIndexing = false;
+            // Use the MFT result as the active index.
+            DirectoryIndexStore.Save(mftIndex);
+            index = new DirectoryIndex(mftIndex);
+            isIndexing = false;
 
-        StartDirectoryWatcher();
+            StartDirectoryWatcher();
+
+            var search = lastSearch;
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                context?.API.ChangeQuery($"dir:{search}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Index benchmark failed: {ex}");
+        }
+        finally
+        {
+            isIndexing = false;
+        }
     }
 
     private void OnDirectoryChanged(string path)
