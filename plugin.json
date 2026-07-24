@@ -1,0 +1,14 @@
+{
+  "ID": "B8B9C5B7A3A44F1A9D4E5C7D8E9F0012",
+  "Disabled": false,
+  "ActionKeyword": "dir:",
+  "Name": "Directory Search",
+  "Author": "Wheelercode",
+  "Version": "0.1.0",
+  "Language": "csharp",
+  "Website": "https://wheelercode.com",
+  "ExecuteFileName": "DirectorySearchPlugin.dll",
+  "IsGlobal": false,
+  "IcoPathDark": "Images\\directory.dark.png",
+  "IcoPathLight": "Images\\directory.light.png"
+}
