@@ -55,16 +55,16 @@ function gitall {
         }
 
         git push origin master
-
-        Write-Host "repo: wheelercode.com/wheelercode/directorysearchplugin"
-        Write-Host "branch: master"
-        Write-Host "commit: "
-
-        git rev-parse HEAD
     }
     finally {
         git status
         Pop-Location
+
+        Write-Host "\n\nrepo: wheelercode.com/wheelercode/directorysearchplugin"
+        Write-Host "branch: master"
+        Write-Host "commit:\n\n"
+        
+        git rev-parse HEAD
     }
 }
 

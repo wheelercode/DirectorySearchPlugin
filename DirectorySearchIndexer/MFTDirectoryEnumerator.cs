@@ -32,9 +32,10 @@ public static class MftDirectoryEnumerator
 
         var principal = new WindowsPrincipal(identity);
 
-        Main.Log(
+        Console.WriteLine(
             $"MFT process identity: {identity.Name}; " +
-            $"Administrator: {principal.IsInRole(WindowsBuiltInRole.Administrator)}");
+            $"Administrator: " +
+            $"{principal.IsInRole(WindowsBuiltInRole.Administrator)}");
 
         var drive = Path.GetPathRoot(root);
 
