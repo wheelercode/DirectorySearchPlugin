@@ -36,20 +36,20 @@ public static class MftDirectoryEnumerator
 
         var volumePath = $@"\\.\{drive.TrimEnd('\\')}";
 
-        using var volume = CreateFile(
+        using var volume = CreateFileW(
             volumePath,
             0,
-            FileShareRead | FileShareWrite | FileShareDelete,
+            FileShareRead | FileShareWrite,
             IntPtr.Zero,
             OpenExisting,
-            0,
+            GenericRead,
             IntPtr.Zero);
 
         if (volume.IsInvalid)
         {
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(),
-                $"Unable to open volume {volumePath}.");
+                $"Unable to open volume {volumePath} with volume {volume}.");
         }
 
         var nodes = ReadDirectoryRecords(volume);
@@ -95,24 +95,41 @@ public static class MftDirectoryEnumerator
         SafeFileHandle volume)
     {
         var nodes = new Dictionary<long, DirectoryNode>();
-        var input = new byte[24];
+
+        // MFT_ENUM_DATA_V1:
+        // StartFileReferenceNumber, LowUsn, HighUsn,
+        // MinMajorVersion, MaxMajorVersion.
+        var input = new byte[32];
         var output = new byte[1024 * 1024];
         long startFileReference = 0;
 
         while (true)
         {
             Array.Clear(input);
+            // MFT_ENUM_DATA_V1.StartFileReferenceNumber
             BinaryPrimitives.WriteInt64LittleEndian(
                 input.AsSpan(0, 8),
                 startFileReference);
 
+            // MFT_ENUM_DATA_V1.LowUsn
             BinaryPrimitives.WriteInt64LittleEndian(
                 input.AsSpan(8, 8),
                 0);
 
+            // MFT_ENUM_DATA_V1.HighUsn
             BinaryPrimitives.WriteInt64LittleEndian(
                 input.AsSpan(16, 8),
                 long.MaxValue);
+
+            // MFT_ENUM_DATA_V1.MinMajorVersion
+            BinaryPrimitives.WriteUInt16LittleEndian(
+                input.AsSpan(24, 2),
+                2);
+
+            // MFT_ENUM_DATA_V1.MaxMajorVersion
+            BinaryPrimitives.WriteUInt16LittleEndian(
+                input.AsSpan(26, 2),
+                2);
 
             var success = DeviceIoControl(
                 volume,
@@ -269,9 +286,10 @@ public static class MftDirectoryEnumerator
 
     [DllImport(
         "kernel32.dll",
+        EntryPoint = "CreateFileW",
         CharSet = CharSet.Unicode,
         SetLastError = true)]
-    private static extern SafeFileHandle CreateFile(
+    private static extern SafeFileHandle CreateFileW(
         string fileName,
         uint desiredAccess,
         uint shareMode,

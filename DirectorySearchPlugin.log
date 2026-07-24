@@ -1,0 +1,14 @@
+2026-07-24T13:10:17.3814474-07:00 No persisted index found; benchmarking index builders.
+2026-07-24T13:10:17.3828798-07:00 Benchmark: starting MFT enumeration.
+2026-07-24T13:10:17.4123553-07:00 Index benchmark failed: System.ComponentModel.Win32Exception (1): FSCTL_ENUM_USN_DATA failed.
+   at Wheelercode.DirectorySearchPlugin.MftDirectoryEnumerator.ReadDirectoryRecords(SafeFileHandle volume) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\MFTDirectoryEnumerator.cs:line 149
+   at Wheelercode.DirectorySearchPlugin.MftDirectoryEnumerator.Enumerate(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\MFTDirectoryEnumerator.cs:line 55
+   at Wheelercode.DirectorySearchPlugin.Main.BuildMftIndex(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 199
+   at Wheelercode.DirectorySearchPlugin.Main.BenchmarkIndexInitialization(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 220
+2026-07-24T13:11:54.8418320-07:00 No persisted index found; benchmarking index builders.
+2026-07-24T13:11:54.8430306-07:00 Benchmark: starting MFT enumeration.
+2026-07-24T13:11:54.8644635-07:00 Index benchmark failed: System.ComponentModel.Win32Exception (1): FSCTL_ENUM_USN_DATA failed.
+   at Wheelercode.DirectorySearchPlugin.MftDirectoryEnumerator.ReadDirectoryRecords(SafeFileHandle volume) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\MFTDirectoryEnumerator.cs:line 149
+   at Wheelercode.DirectorySearchPlugin.MftDirectoryEnumerator.Enumerate(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\MFTDirectoryEnumerator.cs:line 55
+   at Wheelercode.DirectorySearchPlugin.Main.BuildMftIndex(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 199
+   at Wheelercode.DirectorySearchPlugin.Main.BenchmarkIndexInitialization(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 220

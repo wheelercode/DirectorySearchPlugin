@@ -26,8 +26,6 @@ public sealed class Main : IPlugin
     private PluginInitContext? context;
     private string lastSearch = string.Empty;
 
-    private DirectoryWatcher? directoryWatcher;
-
     public void Init(PluginInitContext context)
     {
         this.context = context;
@@ -38,7 +36,6 @@ public sealed class Main : IPlugin
             isIndexing = false;
 
             Log("Loaded persisted directory index.");
-            StartDirectoryWatcher();
             return;
         }
 
@@ -66,8 +63,6 @@ public sealed class Main : IPlugin
                 $"Unique names: {pathsByName.Count:N0}; " +
                 $"Elapsed: {stopwatch.Elapsed}");
 
-            StartDirectoryWatcher();
-
             var search = lastSearch;
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -89,13 +84,13 @@ public sealed class Main : IPlugin
     {
         try
         {
-            var pathsByName = BuildDirectoryScanIndex(root);
+            //var pathsByName = BuildDirectoryScanIndex(root);
 
-            DirectoryIndexStore.Save(pathsByName);
-            index = new DirectoryIndex(pathsByName);
-            isIndexing = false;
+            //DirectoryIndexStore.Save(pathsByName);
+            //index = new DirectoryIndex(pathsByName);
+            //isIndexing = false;
 
-            Log($"Directory index complete. Unique names: {pathsByName.Count:N0}");
+            //Log($"Directory index complete. Unique names: {pathsByName.Count:N0}");
 
             var search = lastSearch;
 
@@ -103,10 +98,6 @@ public sealed class Main : IPlugin
             {
                 this.context?.API.ChangeQuery($"dir:{search}", true);
             }
-
-            StartDirectoryWatcher();
-
-            Log("Directory watcher started.");
         }
         catch (Exception ex)
         {
@@ -213,16 +204,16 @@ public sealed class Main : IPlugin
         try
         {
             var stopwatch = Stopwatch.StartNew();
+            //stopwatch.Restart();
 
-            Log("Benchmark: starting recursive directory scan.");
-            stopwatch.Restart();
-            var directoryScanIndex = BuildDirectoryScanIndex(root);
-            var directoryScanElapsed = stopwatch.Elapsed;
+            //Log("Benchmark: starting recursive directory scan.");
+            //var directoryScanIndex = BuildDirectoryScanIndex(root);
+            //var directoryScanElapsed = stopwatch.Elapsed;
 
-            Log(
-                $"Directory scan benchmark: " +
-                $"Unique names: {directoryScanIndex.Count:N0}; " +
-                $"Elapsed: {directoryScanElapsed}");
+            //Log(
+            //    $"Directory scan benchmark: " +
+            //    $"Unique names: {directoryScanIndex.Count:N0}; " +
+            //    $"Elapsed: {directoryScanElapsed}");
 
             Log("Benchmark: starting MFT enumeration.");
             stopwatch.Restart();
@@ -234,19 +225,17 @@ public sealed class Main : IPlugin
                 $"Unique names: {mftIndex.Count:N0}; " +
                 $"Elapsed: {mftElapsed}");
 
-            if (mftElapsed > TimeSpan.Zero)
-            {
-                Log(
-                    $"MFT speedup: " +
-                    $"{directoryScanElapsed.TotalMilliseconds / mftElapsed.TotalMilliseconds:F2}x");
-            }
+            //if (mftElapsed > TimeSpan.Zero)
+            //{
+            //    Log(
+            //        $"MFT speedup: " +
+            //        $"{directoryScanElapsed.TotalMilliseconds / mftElapsed.TotalMilliseconds:F2}x");
+            //}
 
             // Use the MFT result as the active index.
             DirectoryIndexStore.Save(mftIndex);
             index = new DirectoryIndex(mftIndex);
             isIndexing = false;
-
-            StartDirectoryWatcher();
 
             var search = lastSearch;
 
@@ -263,25 +252,6 @@ public sealed class Main : IPlugin
         {
             isIndexing = false;
         }
-    }
-
-    private void OnDirectoryChanged(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            Log("Directory watcher overflowed; a full rescan will be required.");
-            return;
-        }
-
-        Log($"Directory change detected: {path}");
-    }
-
-    private void StartDirectoryWatcher()
-    {
-        directoryWatcher = new DirectoryWatcher(@"C:\");
-        directoryWatcher.DirectoryChanged += OnDirectoryChanged;
-
-        Log("Directory watcher started.");
     }
 
     public List<Result> Query(Query query)
