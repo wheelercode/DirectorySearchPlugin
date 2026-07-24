@@ -1,34 +1,30 @@
 $ProjectRoot = "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin"
 
-function killpt {
+function killp {
     Get-Process -Name *PowerToys* -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
 function buildp {
-    killpt
+    killp
     Start-Sleep -Milliseconds 500
 
     Push-Location $ProjectRoot
     try {
-        dotnet build `
-            ".\DirectoryIndexPlugin\DirectorySearchPlugin.csproj" `
-            -c Debug
+        dotnet build ".\DirectorySearchPlugin\DirectorySearchPlugin.csproj" -c Debug
     }
     finally {
         Pop-Location
     }
 }
 
-function buildi {
-    killpt
+function buildi{
+    killp
     Start-Sleep -Milliseconds 500
 
     Push-Location $ProjectRoot
     try {
-        dotnet build `
-            ".\DirectorySearchIndexer\DirectorySearchIndexer.csproj" `
-            -c Debug
+        dotnet build ".\DirectorySearchIndexer\DirectorySearchIndexer.csproj" -c Debug
     }
     finally {
         Pop-Location
@@ -66,4 +62,12 @@ function gitall {
     }
 }
 
-Write-Host "Commands: killpt, buildp, buildi, and gitall have been loaded."
+function runp {
+    Start-Process "C:\Program Files\PowerToys\PowerToys.exe"
+}
+
+function runi {
+    Start-Process "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchIndexer\bin\Debug\net10.0-windows10.0.26100.0\DirectorySearchIndexer.exe"
+}
+
+Write-Host "Commands: buildp, buildi, runp, runi, and gitall are now available."
