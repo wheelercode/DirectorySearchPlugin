@@ -64,7 +64,6 @@ function gitall {
         Write-Host "repo: wheelercode.com/wheelercode/directorysearchplugin"
         Write-Host "branch: master"
         Write-Host "commit:"
-        Write-Host ""
         git rev-parse HEAD
     }
 }

@@ -1,12 +1,24 @@
-﻿using System.Security.Principal;
+﻿using Wheelercode.DirectorySearchPlugin;
+using System.Diagnostics;
 
-using var identity = WindowsIdentity.GetCurrent();
-var principal = new WindowsPrincipal(identity);
+var stopwatch = Stopwatch.StartNew();
 
-Console.WriteLine($"Identity: {identity.Name}");
-Console.WriteLine(
-    $"Administrator: " +
-    $"{principal.IsInRole(WindowsBuiltInRole.Administrator)}");
+try
+{
+    Console.WriteLine("Starting MFT directory enumeration...");
+
+    var pathsByName =
+        MftDirectoryEnumerator.Enumerate(@"C:\");
+
+    Console.WriteLine(
+        $"MFT enumeration complete. " +
+        $"Unique directory names: {pathsByName.Count:N0}; " +
+        $"Elapsed: {stopwatch.Elapsed}");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"MFT enumeration failed: {ex}");
+}
 
 Console.WriteLine("Press Enter to exit.");
 Console.ReadLine();
