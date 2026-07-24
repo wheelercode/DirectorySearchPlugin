@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.IO;
 using Microsoft.Win32.SafeHandles;
+using System.Security.Principal;
 
 namespace Wheelercode.DirectorySearchPlugin;
 
@@ -27,6 +28,14 @@ public static class MftDirectoryEnumerator
 
     public static Dictionary<string, List<string>> Enumerate(string root)
     {
+        using var identity = WindowsIdentity.GetCurrent();
+
+        var principal = new WindowsPrincipal(identity);
+
+        Main.Log(
+            $"MFT process identity: {identity.Name}; " +
+            $"Administrator: {principal.IsInRole(WindowsBuiltInRole.Administrator)}");
+
         var drive = Path.GetPathRoot(root);
 
         if (string.IsNullOrWhiteSpace(drive))
@@ -38,11 +47,11 @@ public static class MftDirectoryEnumerator
 
         using var volume = CreateFileW(
             volumePath,
-            0,
+            GenericRead,
             FileShareRead | FileShareWrite,
             IntPtr.Zero,
             OpenExisting,
-            GenericRead,
+            0,
             IntPtr.Zero);
 
         if (volume.IsInvalid)
