@@ -60,10 +60,11 @@ function gitall {
         git status
         Pop-Location
 
-        Write-Host "\n\nrepo: wheelercode.com/wheelercode/directorysearchplugin"
+        Write-Host ""
+        Write-Host "repo: wheelercode.com/wheelercode/directorysearchplugin"
         Write-Host "branch: master"
-        Write-Host "commit:\n\n"
-        
+        Write-Host "commit:"
+        Write-Host ""
         git rev-parse HEAD
     }
 }
