@@ -40,44 +40,6 @@ public sealed class Main : IPlugin
         }
 
         isIndexing = true;
-        Log("No persisted index found; benchmarking index builders.");
-        _ = Task.Run(() => BenchmarkIndexInitialization(@"C:\"));
-    }
-
-    private void InitializeIndexMft(string root)
-    {
-        var stopwatch = Stopwatch.StartNew();
-
-        try
-        {
-            Log("Starting MFT directory enumeration.");
-
-            var pathsByName = MftDirectoryEnumerator.Enumerate(root);
-
-            DirectoryIndexStore.Save(pathsByName);
-            index = new DirectoryIndex(pathsByName);
-            isIndexing = false;
-
-            Log(
-                $"MFT index complete. " +
-                $"Unique names: {pathsByName.Count:N0}; " +
-                $"Elapsed: {stopwatch.Elapsed}");
-
-            var search = lastSearch;
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                context?.API.ChangeQuery($"dir:{search}", true);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"MFT index failed: {ex}");
-        }
-        finally
-        {
-            isIndexing = false;
-        }
     }
 
     private void InitializeIndexDirectoryScan(string root)
@@ -192,66 +154,6 @@ public sealed class Main : IPlugin
             $"errors: {errorCount:N0}");
 
         return pathsByName;
-    }
-
-    private Dictionary<string, List<string>> BuildMftIndex(string root)
-    {
-        return MftDirectoryEnumerator.Enumerate(root);
-    }
-
-    private void BenchmarkIndexInitialization(string root)
-    {
-        try
-        {
-            var stopwatch = Stopwatch.StartNew();
-            //stopwatch.Restart();
-
-            //Log("Benchmark: starting recursive directory scan.");
-            //var directoryScanIndex = BuildDirectoryScanIndex(root);
-            //var directoryScanElapsed = stopwatch.Elapsed;
-
-            //Log(
-            //    $"Directory scan benchmark: " +
-            //    $"Unique names: {directoryScanIndex.Count:N0}; " +
-            //    $"Elapsed: {directoryScanElapsed}");
-
-            Log("Benchmark: starting MFT enumeration.");
-            stopwatch.Restart();
-            var mftIndex = BuildMftIndex(root);
-            var mftElapsed = stopwatch.Elapsed;
-
-            Log(
-                $"MFT enumeration benchmark: " +
-                $"Unique names: {mftIndex.Count:N0}; " +
-                $"Elapsed: {mftElapsed}");
-
-            //if (mftElapsed > TimeSpan.Zero)
-            //{
-            //    Log(
-            //        $"MFT speedup: " +
-            //        $"{directoryScanElapsed.TotalMilliseconds / mftElapsed.TotalMilliseconds:F2}x");
-            //}
-
-            // Use the MFT result as the active index.
-            DirectoryIndexStore.Save(mftIndex);
-            index = new DirectoryIndex(mftIndex);
-            isIndexing = false;
-
-            var search = lastSearch;
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                context?.API.ChangeQuery($"dir:{search}", true);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"Index benchmark failed: {ex}");
-        }
-        finally
-        {
-            isIndexing = false;
-        }
     }
 
     public List<Result> Query(Query query)
