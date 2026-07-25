@@ -11,9 +11,9 @@ $reader = [IO.StreamReader]::new($pipe)
 $writer.AutoFlush = $true
 
 $request = @{
-    Query = "zeta"
+    Query = "youwin"
     MaximumResults = 50
-} | ConvertTo-Json -Compress
+    } | ConvertTo-Json -Compress
 
 $writer.WriteLine($request)
 $reader.ReadLine()

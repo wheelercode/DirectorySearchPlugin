@@ -4,16 +4,23 @@ using Wox.Plugin;
 
 namespace Wheelercode.DirectorySearchPlugin;
 
-public sealed class Main : IPlugin
+public sealed class Main : IPlugin, IDisposable
 {
-    //private static readonly string LogPath =
-    //    Path.Combine(Path.GetTempPath(), "DirectorySearchPlugin.log");
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData),
+        "Wheelercode",
+        "DirectorySearchPlugin",
+        "DirectorySearchPlugin.log");
 
-    private static readonly string LogPath =
-    @"C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchPlugin.log";
-
-    private DirectoryIndex? index;
+    private readonly object refreshLock = new();
+    private volatile DirectoryIndex? index;
     private volatile bool isIndexing;
+    private FileSystemWatcher? indexWatcher;
+    private Timer? refreshTimer;
+    private string? generation;
+    private long lastSequence;
+    private int refreshQueued;
 
     public static string PluginID =>
         "B8B9C5B7A3A44F1A9D4E5C7D8E9F0012";
@@ -29,131 +36,170 @@ public sealed class Main : IPlugin
     public void Init(PluginInitContext context)
     {
         this.context = context;
+        isIndexing = true;
 
-        if (DirectoryIndexStore.TryLoad(out var pathsByName))
+        EnsureIndexWatcher();
+        RefreshIndexFromFiles();
+
+        refreshTimer = new Timer(
+            _ => RefreshIndexFromFiles(),
+            null,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(2));
+    }
+
+    private void RefreshIndexFromFiles()
+    {
+        lock (refreshLock)
         {
-            index = new DirectoryIndex(pathsByName);
-            isIndexing = false;
+            try
+            {
+                EnsureIndexWatcher();
 
-            Log("Loaded persisted directory index.");
+                var currentIndex = index;
+                var currentGeneration = generation;
+
+                if (currentIndex is null ||
+                    string.IsNullOrWhiteSpace(currentGeneration))
+                {
+                    TryLoadFullIndex();
+                    return;
+                }
+
+                if (!DirectoryIndexStore.TryReadUpdates(
+                        currentGeneration,
+                        lastSequence,
+                        out var updates))
+                {
+                    TryLoadFullIndex();
+                    return;
+                }
+
+                if (updates.Count == 0)
+                {
+                    return;
+                }
+
+                currentIndex.Apply(updates);
+                lastSequence = updates[^1].Sequence;
+                isIndexing = false;
+
+                Log(
+                    $"Applied {updates.Count:N0} directory updates; " +
+                    $"sequence={lastSequence:N0}.");
+
+                RefreshCurrentQuery();
+            }
+            catch (Exception exception)
+            {
+                Log($"Directory index refresh failed: {exception}");
+            }
+        }
+    }
+
+    private void TryLoadFullIndex()
+    {
+        if (!DirectoryIndexStore.TryLoad(out var state))
+        {
+            isIndexing = true;
             return;
         }
 
-        isIndexing = true;
-    }
+        var newIndex = new DirectoryIndex(state.PathsByName);
 
-    private void InitializeIndexDirectoryScan(string root)
-    {
-        try
-        {
-            //var pathsByName = BuildDirectoryScanIndex(root);
-
-            //DirectoryIndexStore.Save(pathsByName);
-            //index = new DirectoryIndex(pathsByName);
-            //isIndexing = false;
-
-            //Log($"Directory index complete. Unique names: {pathsByName.Count:N0}");
-
-            var search = lastSearch;
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                this.context?.API.ChangeQuery($"dir:{search}", true);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"Directory index failed: {ex}");
-        }
-        finally
-        {
-            isIndexing = false;
-        }
-    }
-
-    private Dictionary<string, List<string>> BuildDirectoryScanIndex(string root)
-    {
-        var pathsByName = new Dictionary<string, List<string>>(
-            StringComparer.OrdinalIgnoreCase);
-
-        var pending = new Stack<string>();
-        pending.Push(root);
-
-        var directoryCount = 0;
-        var errorCount = 0;
-
-        while (pending.Count > 0)
-        {
-            var current = pending.Pop();
-            directoryCount++;
-
-            try
-            {
-                foreach (var path in Directory.EnumerateDirectories(
-                    current,
-                    "*",
-                    SearchOption.TopDirectoryOnly))
-                {
-                    try
-                    {
-                        var attributes = File.GetAttributes(path);
-
-                        if ((attributes & FileAttributes.ReparsePoint) != 0)
-                        {
-                            continue;
-                        }
-
-                        var name = Path.GetFileName(path);
-
-                        if (string.IsNullOrWhiteSpace(name))
-                        {
-                            continue;
-                        }
-
-                        if (!pathsByName.TryGetValue(name, out var paths))
-                        {
-                            paths = [];
-                            pathsByName[name] = paths;
-                        }
-
-                        paths.Add(path);
-                        pending.Push(path);
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        errorCount++;
-                    }
-                    catch (IOException)
-                    {
-                        errorCount++;
-                    }
-                }
-            }
-            catch (UnauthorizedAccessException)
-            {
-                errorCount++;
-            }
-            catch (IOException)
-            {
-                errorCount++;
-            }
-
-            if (directoryCount % 10_000 == 0)
-            {
-                Log(
-                    $"Directory scan progress: {directoryCount:N0}; " +
-                    $"unique names: {pathsByName.Count:N0}; " +
-                    $"errors: {errorCount:N0}");
-            }
-        }
+        index = newIndex;
+        generation = state.Generation;
+        lastSequence = state.LastSequence;
+        isIndexing = false;
 
         Log(
-            $"Directory scan enumeration complete. " +
-            $"Directories: {directoryCount:N0}; " +
-            $"unique names: {pathsByName.Count:N0}; " +
-            $"errors: {errorCount:N0}");
+            $"Loaded directory index generation " +
+            $"{generation}; unique names: " +
+            $"{state.PathsByName.Count:N0}; sequence=" +
+            $"{lastSequence:N0}.");
 
-        return pathsByName;
+        RefreshCurrentQuery();
+    }
+
+    private void EnsureIndexWatcher()
+    {
+        if (indexWatcher is not null ||
+            !Directory.Exists(
+                DirectoryIndexStore.DataDirectory))
+        {
+            return;
+        }
+
+        indexWatcher = new FileSystemWatcher(
+            DirectoryIndexStore.DataDirectory)
+        {
+            Filter = "*",
+            NotifyFilter =
+                NotifyFilters.FileName |
+                NotifyFilters.LastWrite |
+                NotifyFilters.Size,
+            EnableRaisingEvents = true,
+        };
+
+        indexWatcher.Changed += IndexFilesChanged;
+        indexWatcher.Created += IndexFilesChanged;
+        indexWatcher.Deleted += IndexFilesChanged;
+        indexWatcher.Renamed += IndexFilesRenamed;
+        indexWatcher.Error += IndexWatcherError;
+    }
+
+    private void IndexFilesChanged(
+        object sender,
+        FileSystemEventArgs eventArgs)
+    {
+        QueueIndexRefresh();
+    }
+
+    private void IndexFilesRenamed(
+        object sender,
+        RenamedEventArgs eventArgs)
+    {
+        QueueIndexRefresh();
+    }
+
+    private void IndexWatcherError(
+        object sender,
+        ErrorEventArgs eventArgs)
+    {
+        QueueIndexRefresh();
+    }
+
+    private void QueueIndexRefresh()
+    {
+        if (Interlocked.Exchange(ref refreshQueued, 1) != 0)
+        {
+            return;
+        }
+
+        ThreadPool.QueueUserWorkItem(
+            _ =>
+            {
+                try
+                {
+                    RefreshIndexFromFiles();
+                }
+                finally
+                {
+                    Volatile.Write(ref refreshQueued, 0);
+                }
+            });
+    }
+
+    private void RefreshCurrentQuery()
+    {
+        var search = lastSearch;
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            this.context?.API.ChangeQuery(
+                $@"\\{search}",
+                true);
+        }
     }
 
     public List<Result> Query(Query query)
@@ -166,37 +212,29 @@ public sealed class Main : IPlugin
             return [];
         }
 
-        IEnumerable<string> matches;
+        var currentIndex = index;
 
-        if (DirectorySearchPipeClient.TrySearch(
-                searchText,
-                out var liveMatches))
+        if (currentIndex is null)
         {
-            matches = liveMatches;
-        }
-        else
-        {
-            var currentIndex = index;
-
-            if (isIndexing || currentIndex is null)
-            {
-                return
-                [
-                    new Result
-                    {
-                        Title = "Directory index is still initializing",
-                        SubTitle = "Please try again shortly.",
-                        Score = 10_000,
-                    },
-                ];
-            }
-
-            matches = currentIndex.Search(searchText);
+            return
+            [
+                new Result
+                {
+                    Title = isIndexing
+                        ? "Directory index is still initializing"
+                        : "Directory index could not be initialized",
+                    SubTitle = isIndexing
+                        ? "Please try again shortly."
+                        : "See DirectorySearchPlugin.log for details.",
+                    Score = 10_000,
+                },
+            ];
         }
 
         var results = new List<Result>();
 
-        var rankedMatches = matches
+        var rankedMatches = currentIndex
+            .Search(searchText)
             .Select(path => new
             {
                 Path = path,
@@ -296,8 +334,26 @@ public sealed class Main : IPlugin
 
     internal static void Log(string message)
     {
-        File.AppendAllText(
-            LogPath,
-            $"{DateTime.Now:O} {message}{Environment.NewLine}");
+        try
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(LogPath)!);
+
+            File.AppendAllText(
+                LogPath,
+                $"{DateTime.Now:O} {message}" +
+                $"{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging must never break PowerToys Run.
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+        indexWatcher?.Dispose();
+        index?.Dispose();
     }
 }

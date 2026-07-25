@@ -73,7 +73,19 @@ function runp {
 }
 
 function runi {
-    Start-Process "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchIndexer\bin\Debug\net10.0-windows10.0.26100.0\DirectorySearchIndexer.exe"
+    Start-Process "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchIndexer\bin\Debug\net10.0-windows10.0.26100.0\DirectorySearchIndexer.exe" -Verb RunAs
+}
+
+function installsvc {
+    & "$ProjectRoot\install-service.ps1"
+}
+
+function uninstallsvc {
+    & "$ProjectRoot\uninstall-service.ps1"
+}
+
+function svcstatus {
+    Get-Service -Name "WheelercodeDirectorySearch"
 }
 
 function buildJunction {
@@ -85,4 +97,4 @@ function log {
     Invoke-Item "$env:LOCALAPPDATA\Microsoft\PowerToys\PowerToys Run\Logs"
 }
 
-Write-Host "Commands: buildp, buildi, runp, runi, buildJunction, log, and gitall are now available."
+Write-Host "Commands: buildp, buildi, runp, runi, installsvc, uninstallsvc, svcstatus, buildJunction, log, and gitall are now available."

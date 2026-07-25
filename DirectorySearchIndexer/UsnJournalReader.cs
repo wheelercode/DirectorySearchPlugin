@@ -13,7 +13,8 @@ internal readonly record struct UsnJournalCheckpoint(
 internal readonly record struct JournalReadBatch(
     UsnJournalCheckpoint Checkpoint,
     int RecordsRead,
-    DirectoryMutationSummary Mutations);
+    DirectoryMutationSummary Mutations,
+    IReadOnlyList<DirectoryIndexUpdateDraft> Updates);
 
 internal sealed class UsnJournalResetException : Exception
 {
@@ -199,14 +200,15 @@ internal sealed class UsnJournalReader
             bytesReturned,
             mutations);
 
-        var mutationSummary = index.Apply(mutations);
+        var mutationResult = index.Apply(mutations);
 
         return new JournalReadBatch(
             new UsnJournalCheckpoint(
                 checkpoint.JournalId,
                 nextUsn),
             recordsRead,
-            mutationSummary);
+            mutationResult.Summary,
+            mutationResult.Updates);
     }
 
     internal static int ParseRecords(

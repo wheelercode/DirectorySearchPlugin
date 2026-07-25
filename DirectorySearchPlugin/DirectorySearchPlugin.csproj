@@ -15,6 +15,7 @@
     <PackageReference Include="Community.PowerToys.Run.Plugin.Dependencies" Version="0.97.0" />
     
     <Compile Remove="PowerToysRunContract.cs" />
+    <Compile Remove="DirectorySearchPipeClient.cs" />
 
     <None Include="plugin.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -24,7 +25,6 @@
   <ItemGroup>
     <Compile Include="..\DirectoryIndexFiles\DirectoryIndexStore.cs"
              Link="DirectoryIndexStore.cs" />
-    <Compile Include="..\DirectoryIndexFiles\DirectorySearchProtocol.cs"
-             Link="DirectorySearchProtocol.cs" />
   </ItemGroup>
+
 </Project>

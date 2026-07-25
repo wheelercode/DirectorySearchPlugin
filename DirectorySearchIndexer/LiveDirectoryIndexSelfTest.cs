@@ -39,7 +39,7 @@ internal static class LiveDirectoryIndexSelfTest
             @"C:\Projects\Alpha",
             "Initial MFT snapshot");
 
-        index.Apply(
+        var renameResult = index.Apply(
         [
             new DirectoryMutation(
                 DirectoryMutationKind.Remove,
@@ -54,6 +54,18 @@ internal static class LiveDirectoryIndexSelfTest
                 "Code",
                 false),
         ]);
+
+        AssertUpdate(
+            renameResult.Updates,
+            DirectoryIndexUpdateKind.Remove,
+            @"C:\Projects\Alpha",
+            "Parent rename did not remove the old child path.");
+
+        AssertUpdate(
+            renameResult.Updates,
+            DirectoryIndexUpdateKind.Upsert,
+            @"C:\Code\Alpha",
+            "Parent rename did not publish the new child path.");
 
         AssertSinglePath(
             index.Search("Alpha", 10),
@@ -184,6 +196,22 @@ internal static class LiveDirectoryIndexSelfTest
                 expected,
                 StringComparison.OrdinalIgnoreCase),
             $"{scenario} returned an unexpected path.");
+    }
+
+    private static void AssertUpdate(
+        IReadOnlyList<DirectoryIndexUpdateDraft> updates,
+        DirectoryIndexUpdateKind kind,
+        string path,
+        string message)
+    {
+        Assert(
+            updates.Any(
+                update =>
+                    update.Kind == kind &&
+                    update.Path.Equals(
+                        path,
+                        StringComparison.Ordinal)),
+            message);
     }
 
     private static void Assert(
