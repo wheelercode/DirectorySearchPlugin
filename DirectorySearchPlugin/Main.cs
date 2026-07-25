@@ -166,25 +166,37 @@ public sealed class Main : IPlugin
             return [];
         }
 
-        var currentIndex = index;
+        IEnumerable<string> matches;
 
-        if (isIndexing || currentIndex is null)
+        if (DirectorySearchPipeClient.TrySearch(
+                searchText,
+                out var liveMatches))
         {
-            return
-            [
-                new Result
-                {
-                    Title = "Directory index is still initializing",
-                    SubTitle = "Please try again shortly.",
-                    Score = 10_000,
-                },
-            ];
+            matches = liveMatches;
+        }
+        else
+        {
+            var currentIndex = index;
+
+            if (isIndexing || currentIndex is null)
+            {
+                return
+                [
+                    new Result
+                    {
+                        Title = "Directory index is still initializing",
+                        SubTitle = "Please try again shortly.",
+                        Score = 10_000,
+                    },
+                ];
+            }
+
+            matches = currentIndex.Search(searchText);
         }
 
         var results = new List<Result>();
 
-        var rankedMatches = currentIndex
-            .Search(searchText)
+        var rankedMatches = matches
             .Select(path => new
             {
                 Path = path,

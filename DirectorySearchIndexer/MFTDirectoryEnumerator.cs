@@ -14,6 +14,7 @@ public static class MftDirectoryEnumerator
     private const uint GenericRead = 0x80000000;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
+    private const uint FileShareDelete = 0x00000004;
     private const uint OpenExisting = 3;
 
     private const int ErrorHandleEof = 38;
@@ -21,22 +22,15 @@ public static class MftDirectoryEnumerator
     private const uint FileAttributeDirectory = 0x00000010;
     private const uint FileAttributeReparsePoint = 0x00000400;
 
-    private const ulong MftRecordNumberMask = 0x0000FFFFFFFFFFFFUL;
-    private const ulong RootMftRecordNumber = 5;
-
-    private sealed record DirectoryNode(
-        ulong FileReference,
-        ulong ParentFileReference,
-        string Name,
-        bool IsReparsePoint);
-
-    private static bool IsRootReference(ulong fileReference)
+    public static Dictionary<string, List<string>> Enumerate(string root)
     {
-        return (fileReference & MftRecordNumberMask)
-            == RootMftRecordNumber;
+        var snapshot = EnumerateSnapshot(root);
+        using var index = new LiveDirectoryIndex(snapshot);
+
+        return index.CreatePathSnapshot();
     }
 
-    public static Dictionary<string, List<string>> Enumerate(string root)
+    internal static MftDirectorySnapshot EnumerateSnapshot(string root)
     {
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
@@ -60,7 +54,7 @@ public static class MftDirectoryEnumerator
         using var volume = CreateFileW(
             volumePath,
             GenericRead,
-            FileShareRead | FileShareWrite,
+            FileShareRead | FileShareWrite | FileShareDelete,
             IntPtr.Zero,
             OpenExisting,
             0,
@@ -74,17 +68,30 @@ public static class MftDirectoryEnumerator
         }
 
         var nodes = ReadDirectoryRecords(volume);
+        var missingParentCount = CountMissingParents(nodes);
 
+        Console.WriteLine(
+            $"Missing parent references: {missingParentCount:N0}");
+
+        Console.WriteLine(
+            $"Directory nodes collected: {nodes.Count:N0}");
+
+        return new MftDirectorySnapshot(normalizedRoot, nodes);
+    }
+
+    private static int CountMissingParents(
+        IReadOnlyDictionary<ulong, DirectoryNode> nodes)
+    {
         var missingParentCount = 0;
 
         foreach (var node in nodes.Values)
         {
-            if (IsRootReference(node.FileReference))
+            if (DirectoryReference.IsRoot(node.FileReference))
             {
                 continue;
             }
 
-            if (!IsRootReference(node.ParentFileReference) &&
+            if (!DirectoryReference.IsRoot(node.ParentFileReference) &&
                 !nodes.ContainsKey(node.ParentFileReference))
             {
                 missingParentCount++;
@@ -101,7 +108,7 @@ public static class MftDirectoryEnumerator
         }
 
         var rootNode = nodes.Values.FirstOrDefault(
-            node => IsRootReference(node.FileReference));
+            node => DirectoryReference.IsRoot(node.FileReference));
 
         if (rootNode is not null)
         {
@@ -118,73 +125,7 @@ public static class MftDirectoryEnumerator
                 "MFT record 5 will be treated as root.");
         }
 
-        Console.WriteLine(
-            $"Missing parent references: {missingParentCount:N0}");
-
-        Console.WriteLine(
-            $"Directory nodes collected: {nodes.Count:N0}");
-
-        var resolvedPaths = new Dictionary<ulong, string?>();
-
-        var pathsByName = new Dictionary<string, List<string>>(
-            StringComparer.OrdinalIgnoreCase);
-
-        var resolvedCount = 0;
-        var unresolvedCount = 0;
-        var skippedReparseCount = 0;
-
-        foreach (var node in nodes.Values)
-        {
-            if (IsRootReference(node.FileReference))
-            {
-                continue;
-            }
-
-            if (node.IsReparsePoint)
-            {
-                skippedReparseCount++;
-                continue;
-            }
-
-            var path = ResolvePath(
-                node.FileReference,
-                nodes,
-                resolvedPaths,
-                normalizedRoot,
-                new HashSet<ulong>());
-
-            if (path is null)
-            {   
-                unresolvedCount++;
-                continue;
-            }
-
-            resolvedCount++;
-
-            var name = Path.GetFileName(path);
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            if (!pathsByName.TryGetValue(name, out var paths))
-            {
-                paths = [];
-                pathsByName[name] = paths;
-            }
-
-            paths.Add(path);
-        }
-
-        Console.WriteLine(
-            $"Path resolution: " +
-            $"resolved={resolvedCount:N0}; " +
-            $"unresolved={unresolvedCount:N0}; " +
-            $"reparseSkipped={skippedReparseCount:N0}; " +
-            $"uniqueNames={pathsByName.Count:N0}");
-
-        return pathsByName;
+        return missingParentCount;
     }
 
     private static Dictionary<ulong, DirectoryNode> ReadDirectoryRecords(
@@ -245,7 +186,9 @@ public static class MftDirectoryEnumerator
                 out var bytesReturned,
                 IntPtr.Zero);
 
-            var error = Marshal.GetLastWin32Error();
+            var error = success
+                ? 0
+                : Marshal.GetLastWin32Error();
 
             if (!success && error != ErrorHandleEof)
             {
@@ -339,7 +282,8 @@ public static class MftDirectoryEnumerator
                 var isReparsePoint =
                     (fileAttributes & FileAttributeReparsePoint) != 0;
 
-                // Use the complete 64-bit FRN as the dictionary key.
+                // Keep the complete 64-bit FRN, including its sequence
+                // number. The journal emits the same identifier.
                 nodes[fileReference] = new DirectoryNode(
                     fileReference,
                     parentFileReference,
@@ -366,57 +310,6 @@ public static class MftDirectoryEnumerator
             $"nodes={nodes.Count:N0}");
 
         return nodes;
-    }
-
-    private static string? ResolvePath(
-        ulong fileReference,
-        IReadOnlyDictionary<ulong, DirectoryNode> nodes,
-        IDictionary<ulong, string?> cache,
-        string root,
-        ISet<ulong> resolving)
-    {
-        if (cache.TryGetValue(fileReference, out var cached))
-        {
-            return cached;
-        }
-
-        if (IsRootReference(fileReference))
-        {
-            cache[fileReference] = root;
-            return root;
-        }
-
-        if (!nodes.TryGetValue(fileReference, out var node))
-        {
-            cache[fileReference] = null;
-            return null;
-        }
-
-        if (!resolving.Add(fileReference))
-        {
-            cache[fileReference] = null;
-            return null;
-        }
-
-        var parentPath = ResolvePath(
-            node.ParentFileReference,
-            nodes,
-            cache,
-            root,
-            resolving);
-
-        resolving.Remove(fileReference);
-
-        if (parentPath is null)
-        {
-            cache[fileReference] = null;
-            return null;
-        }
-
-        var path = Path.Combine(parentPath, node.Name);
-
-        cache[fileReference] = path;
-        return path;
     }
 
     [DllImport(

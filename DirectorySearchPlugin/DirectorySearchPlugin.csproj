@@ -19,12 +19,12 @@
     <None Include="plugin.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-
-    <PackageReference Include="System.Data.OleDb" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\DirectoryIndexFiles\DirectoryIndexStore.cs"
              Link="DirectoryIndexStore.cs" />
+    <Compile Include="..\DirectoryIndexFiles\DirectorySearchProtocol.cs"
+             Link="DirectorySearchProtocol.cs" />
   </ItemGroup>
 </Project>
