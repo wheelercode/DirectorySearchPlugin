@@ -84,7 +84,8 @@ public static class MftDirectoryEnumerator
                 continue;
             }
 
-            if (!nodes.ContainsKey(node.ParentFileReference))
+            if (!IsRootReference(node.ParentFileReference) &&
+                !nodes.ContainsKey(node.ParentFileReference))
             {
                 missingParentCount++;
 
