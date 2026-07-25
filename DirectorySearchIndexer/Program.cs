@@ -8,10 +8,14 @@ try
     Console.WriteLine("Starting MFT directory enumeration...");
 
     var pathsByName =
-        MftDirectoryEnumerator.Enumerate(@"C:\");
+    MftDirectoryEnumerator.Enumerate(@"C:\");
+
+    DirectoryIndexStore.Save(pathsByName);
+
+    Console.WriteLine("Directory index saved.");
 
     Console.WriteLine(
-        $"MFT enumeration complete. " +
+            $"MFT enumeration complete. " +
         $"Unique directory names: {pathsByName.Count:N0}; " +
         $"Elapsed: {stopwatch.Elapsed}");
 }

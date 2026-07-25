@@ -76,4 +76,9 @@ function runi {
     Start-Process "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchIndexer\bin\Debug\net10.0-windows10.0.26100.0\DirectorySearchIndexer.exe"
 }
 
-Write-Host "Commands: buildp, buildi, runp, runi, and gitall are now available."
+function buildJunction {
+    Remove-Item "$env:LOCALAPPDATA\Microsoft\PowerToys\PowerToys Run\Plugins\DirectorySearchPlugin" -Force
+    New-Item -ItemType Junction -Path "$env:LOCALAPPDATA\Microsoft\PowerToys\PowerToys Run\Plugins\DirectorySearchPlugin" -Target "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchPlugin\bin\Debug\net10.0-windows10.0.26100.0"
+}
+
+Write-Host "Commands: buildp, buildi, runp, runi, buildJunction, and gitall are now available."
