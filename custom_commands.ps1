@@ -81,4 +81,8 @@ function buildJunction {
     New-Item -ItemType Junction -Path "$env:LOCALAPPDATA\Microsoft\PowerToys\PowerToys Run\Plugins\DirectorySearchPlugin" -Target "C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\DirectorySearchPlugin\bin\Debug\net10.0-windows10.0.26100.0"
 }
 
-Write-Host "Commands: buildp, buildi, runp, runi, buildJunction, and gitall are now available."
+function log {
+    Invoke-Item "$env:LOCALAPPDATA\Microsoft\PowerToys\PowerToys Run\Logs"
+}
+
+Write-Host "Commands: buildp, buildi, runp, runi, buildJunction, log, and gitall are now available."

@@ -8,6 +8,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DirectoryIndexFiles\DirectoryIndexFiles.csproj" />
+    <Compile Include="..\DirectoryIndexFiles\DirectoryIndexStore.cs"
+             Link="DirectoryIndexStore.cs" />
   </ItemGroup>
 </Project>

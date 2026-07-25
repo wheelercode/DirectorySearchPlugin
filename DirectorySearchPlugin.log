@@ -1,7 +1,2 @@
-2026-07-24T13:29:07.4028425-07:00 No persisted index found; benchmarking index builders.
-2026-07-24T13:29:07.4040756-07:00 Benchmark: starting MFT enumeration.
-2026-07-24T13:29:07.4080700-07:00 MFT process identity: WHEELERDESKTOP\wheel; Administrator: False
-2026-07-24T13:29:07.4175707-07:00 Index benchmark failed: System.ComponentModel.Win32Exception (5): Unable to open volume \\.\C: with volume Microsoft.Win32.SafeHandles.SafeFileHandle.
-   at Wheelercode.DirectorySearchPlugin.MftDirectoryEnumerator.Enumerate(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\MFTDirectoryEnumerator.cs:line 59
-   at Wheelercode.DirectorySearchPlugin.Main.BuildMftIndex(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 199
-   at Wheelercode.DirectorySearchPlugin.Main.BenchmarkIndexInitialization(String root) in C:\Users\wheel\Documents\code\C#\DirectorySearchPlugin\Main.cs:line 220
+2026-07-24T18:51:56.9129085-07:00 Loaded persisted directory index.
+2026-07-24T21:35:17.0356244-07:00 Loaded persisted directory index.
